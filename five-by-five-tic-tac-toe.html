@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5x5 Tic Tac Toe (4-in-a-row)</title>
+    <style>
+        :root {
+            --cell-size: 60px;
+            --board-color: #f0f0f0;
+            --border-color: #ddd;
+            --player-color: #3498db;
+            --ai-color: #e74c3c;
+            --hover-color: #ecf0f1;
+            --win-highlight: #2ecc71;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #fff;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        h2 {
+            color: #666;
+            font-size: 1rem;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .status {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            height: 30px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(5, var(--cell-size));
+            grid-template-rows: repeat(5, var(--cell-size));
+            gap: 5px;
+            background-color: var(--board-color);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: white;
+            border: 2px solid var(--border-color);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .cell:hover:not(.marked) {
+            background-color: var(--hover-color);
+            transform: scale(1.05);
+        }
+
+        .cell.player {
+            color: var(--player-color);
+        }
+
+        .cell.ai {
+            color: var(--ai-color);
+        }
+        
+        .cell.winning-cell {
+            background-color: var(--win-highlight);
+            color: white;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        .legend {
+            display: flex;
+            margin-top: 15px;
+            gap: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-icon {
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .player-icon {
+            color: var(--player-color);
+        }
+
+        .ai-icon {
+            color: var(--ai-color);
+        }
+
+        @media (max-width: 480px) {
+            :root {
+                --cell-size: 50px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>5x5 Tic Tac Toe</h1>
+    <h2>Get 4 in a row to win!</h2>
+    <div class="game-container">
+        <div class="status" id="status">Your turn (X)</div>
+        <div class="board" id="board"></div>
+        <div class="controls">
+            <button id="reset-btn">Reset Game</button>
+        </div>
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-icon player-icon">X</span>
+                <span>You</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-icon ai-icon">O</span>
+                <span>AI</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game state and constants
+        const BOARD_SIZE = 5;
+        const WIN_CONDITION = 4; // Number of symbols in a row needed to win
+        const PLAYER = 'X';
+        const AI = 'O';
+        const EMPTY = '';
+        
+        let gameBoard = [];
+        let currentPlayer = PLAYER;
+        let gameActive = true;
+        let winningCells = []; // Track winning cells for highlighting
+
+        // DOM elements
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const resetButton = document.getElementById('reset-btn');
+
+        // Initialize the game
+        initGame();
+
+        // Function to initialize or reset the game
+        function initGame() {
+            // Create a 5x5 empty board
+            gameBoard = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(EMPTY));
+            currentPlayer = PLAYER;
+            gameActive = true;
+            winningCells = [];
+
+            // Update status
+            statusElement.textContent = 'Your turn (X)';
+            
+            // Clear and rebuild the board UI
+            boardElement.innerHTML = '';
+            
+            // Create the grid cells
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    
+                    // Add click event listener
+                    cell.addEventListener('click', handleCellClick);
+                    
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        // Handle player's move
+        function handleCellClick(event) {
+            if (!gameActive) return;
+            
+            const row = parseInt(event.target.dataset.row);
+            const col = parseInt(event.target.dataset.col);
+            
+            // Check if the cell is empty
+            if (gameBoard[row][col] !== EMPTY) return;
+            
+            // Make player's move
+            makeMove(row, col, PLAYER);
+            
+            // Check for win or draw
+            if (!checkGameStatus()) {
+                // AI's turn
+                setTimeout(makeAIMove, 500);
+            }
+        }
+
+        // Make a move
+        function makeMove(row, col, player) {
+            // Update game board
+            gameBoard[row][col] = player;
+            
+            // Update UI
+            const cellIndex = row * BOARD_SIZE + col;
+            const cell = boardElement.children[cellIndex];
+            cell.textContent = player;
+            cell.classList.add('marked');
+            cell.classList.add(player === PLAYER ? 'player' : 'ai');
+            
+            // Change current player
+            currentPlayer = currentPlayer === PLAYER ? AI : PLAYER;
+        }
+
+        // AI makes a move
+        function makeAIMove() {
+            if (!gameActive) return;
+            
+            // Simple AI implementation:
+            // 1. Win if possible
+            // 2. Block player from winning
+            // 3. Choose center if available
+            // 4. Choose random available spot
+            
+            // Check for winning move
+            const winMove = findWinningMove(AI);
+            if (winMove) {
+                makeMove(winMove.row, winMove.col, AI);
+                checkGameStatus();
+                return;
+            }
+            
+            // Check for blocking move
+            const blockMove = findWinningMove(PLAYER);
+            if (blockMove) {
+                makeMove(blockMove.row, blockMove.col, AI);
+                checkGameStatus();
+                return;
+            }
+            
+            // Try to take the center
+            const center = Math.floor(BOARD_SIZE / 2);
+            if (gameBoard[center][center] === EMPTY) {
+                makeMove(center, center, AI);
+                checkGameStatus();
+                return;
+            }
+            
+            // Choose a random empty cell
+            const emptyCells = [];
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    if (gameBoard[row][col] === EMPTY) {
+                        emptyCells.push({ row, col });
+                    }
+                }
+            }
+            
+            if (emptyCells.length > 0) {
+                const randomIndex = Math.floor(Math.random() * emptyCells.length);
+                const { row, col } = emptyCells[randomIndex];
+                makeMove(row, col, AI);
+                checkGameStatus();
+            }
+        }
+
+        // Find a winning move for the given player
+        function findWinningMove(player) {
+            // Try each empty cell
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    if (gameBoard[row][col] === EMPTY) {
+                        // Temporarily make the move
+                        gameBoard[row][col] = player;
+                        
+                        // Check if this results in a win
+                        const winResult = checkWinnerDetailed(player);
+                        
+                        // Undo the move
+                        gameBoard[row][col] = EMPTY;
+                        
+                        // If it's a winning move, return it
+                        if (winResult.isWin) {
+                            return { row, col };
+                        }
+                    }
+                }
+            }
+            
+            // No winning move found
+            return null;
+        }
+
+        // Check game status (win or draw)
+        function checkGameStatus() {
+            // Check for winner
+            const playerWinResult = checkWinnerDetailed(PLAYER);
+            if (playerWinResult.isWin) {
+                statusElement.textContent = 'You win!';
+                gameActive = false;
+                highlightWinningCells(playerWinResult.cells);
+                return true;
+            }
+            
+            const aiWinResult = checkWinnerDetailed(AI);
+            if (aiWinResult.isWin) {
+                statusElement.textContent = 'AI wins!';
+                gameActive = false;
+                highlightWinningCells(aiWinResult.cells);
+                return true;
+            }
+            
+            // Check for draw
+            if (isBoardFull()) {
+                statusElement.textContent = "It's a draw!";
+                gameActive = false;
+                return true;
+            }
+            
+            // Game continues
+            statusElement.textContent = currentPlayer === PLAYER ? 'Your turn (X)' : 'AI thinking... (O)';
+            return false;
+        }
+
+        // Highlight winning cells
+        function highlightWinningCells(cells) {
+            cells.forEach(({row, col}) => {
+                const cellIndex = row * BOARD_SIZE + col;
+                const cell = boardElement.children[cellIndex];
+                cell.classList.add('winning-cell');
+            });
+        }
+
+        // Check if the board is full (draw)
+        function isBoardFull() {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    if (gameBoard[row][col] === EMPTY) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        // Check if the given player has won and return winning cells
+        function checkWinnerDetailed(player) {
+            // Check all possible winning patterns and return winning cells
+            
+            // Check rows
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col <= BOARD_SIZE - WIN_CONDITION; col++) {
+                    let win = true;
+                    const cells = [];
+                    
+                    for (let i = 0; i < WIN_CONDITION; i++) {
+                        if (gameBoard[row][col + i] !== player) {
+                            win = false;
+                            break;
+                        }
+                        cells.push({row, col: col + i});
+                    }
+                    
+                    if (win) return { isWin: true, cells };
+                }
+            }
+            
+            // Check columns
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                for (let row = 0; row <= BOARD_SIZE - WIN_CONDITION; row++) {
+                    let win = true;
+                    const cells = [];
+                    
+                    for (let i = 0; i < WIN_CONDITION; i++) {
+                        if (gameBoard[row + i][col] !== player) {
+                            win = false;
+                            break;
+                        }
+                        cells.push({row: row + i, col});
+                    }
+                    
+                    if (win) return { isWin: true, cells };
+                }
+            }
+            
+            // Check diagonals (top-left to bottom-right)
+            for (let row = 0; row <= BOARD_SIZE - WIN_CONDITION; row++) {
+                for (let col = 0; col <= BOARD_SIZE - WIN_CONDITION; col++) {
+                    let win = true;
+                    const cells = [];
+                    
+                    for (let i = 0; i < WIN_CONDITION; i++) {
+                        if (gameBoard[row + i][col + i] !== player) {
+                            win = false;
+                            break;
+                        }
+                        cells.push({row: row + i, col: col + i});
+                    }
+                    
+                    if (win) return { isWin: true, cells };
+                }
+            }
+            
+            // Check diagonals (top-right to bottom-left)
+            for (let row = 0; row <= BOARD_SIZE - WIN_CONDITION; row++) {
+                for (let col = WIN_CONDITION - 1; col < BOARD_SIZE; col++) {
+                    let win = true;
+                    const cells = [];
+                    
+                    for (let i = 0; i < WIN_CONDITION; i++) {
+                        if (gameBoard[row + i][col - i] !== player) {
+                            win = false;
+                            break;
+                        }
+                        cells.push({row: row + i, col: col - i});
+                    }
+                    
+                    if (win) return { isWin: true, cells };
+                }
+            }
+            
+            return { isWin: false, cells: [] };
+        }
+
+        // Simpler version that just returns boolean for internal use
+        function checkWinner(player) {
+            return checkWinnerDetailed(player).isWin;
+        }
+
+        // Reset button event listener
+        resetButton.addEventListener('click', initGame);
+    </script>
+</body>
+</html>
